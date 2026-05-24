@@ -122,15 +122,28 @@ def _cached_path(spotify_id: str) -> Path | None:
     return p if p.exists() else None
 
 
+def _normalize(text: str) -> str:
+    import unicodedata
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', text)
+        if unicodedata.category(c) != 'Mn'
+    )
+
+
 def _ytdlp(title: str, artists: str, spotify_id: str) -> Path | None:
     out_tpl = str(CACHE_DIR / f"{spotify_id}.%(ext)s")
     mp3_path = CACHE_DIR / f"{spotify_id}.mp3"
 
-    # Try YouTube Music first, then fall back to regular YouTube
+    t, a = title.strip(), artists.strip()
+    tn, an = _normalize(t), _normalize(a)
+
+    # Try YouTube Music first, then YouTube, with and without accent normalization
     queries = [
-        f"ytmsearch1:{title} {artists}",
-        f"ytsearch1:{title} {artists} audio",
-        f"ytsearch1:{title} audio",
+        f"ytmsearch1:{t} {a}",
+        f"ytsearch1:{t} {a} audio",
+        f"ytmsearch1:{tn} {an}",
+        f"ytsearch1:{tn} {an} audio",
+        f"ytsearch1:{tn} audio",
     ]
 
     base_cmd = [
