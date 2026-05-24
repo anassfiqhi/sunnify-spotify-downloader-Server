@@ -124,24 +124,48 @@ def _cached_path(spotify_id: str) -> Path | None:
 
 def _ytdlp(title: str, artists: str, spotify_id: str) -> Path | None:
     out_tpl = str(CACHE_DIR / f"{spotify_id}.%(ext)s")
-    query = f"ytsearch1:{title} {artists} audio"
-    cmd = [
+    mp3_path = CACHE_DIR / f"{spotify_id}.mp3"
+
+    # Try YouTube Music first, then fall back to regular YouTube
+    queries = [
+        f"ytmsearch1:{title} {artists}",
+        f"ytsearch1:{title} {artists} audio",
+        f"ytsearch1:{title} audio",
+    ]
+
+    base_cmd = [
         "yt-dlp",
         "--no-playlist",
         "--extract-audio",
         "--audio-format", "mp3",
         "--audio-quality", "0",
         "--output", out_tpl,
-        "--no-warnings",
-        "--quiet",
-        query,
+        "--extractor-retries", "3",
+        "--retries", "3",
     ]
-    try:
-        subprocess.run(cmd, capture_output=True, timeout=180, check=False)
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return None
-    p = CACHE_DIR / f"{spotify_id}.mp3"
-    return p if p.exists() else None
+
+    for query in queries:
+        try:
+            result = subprocess.run(
+                base_cmd + [query],
+                capture_output=True,
+                timeout=180,
+                check=False,
+                text=True,
+            )
+            if mp3_path.exists():
+                return mp3_path
+            if result.returncode != 0:
+                print(f"[yt-dlp] FAILED query={query!r} rc={result.returncode}")
+                if result.stderr:
+                    print(f"[yt-dlp] stderr: {result.stderr[:500]}")
+        except subprocess.TimeoutExpired:
+            print(f"[yt-dlp] TIMEOUT query={query!r}")
+        except FileNotFoundError:
+            print("[yt-dlp] not found — is yt-dlp installed?")
+            return None
+
+    return None
 
 
 def _ensure_downloaded(spotify_id: str) -> Path | None:
@@ -210,7 +234,7 @@ def download():
         p = _ytdlp(title, artists, spotify_id)
         if p:
             return jsonify({"success": True})
-        return jsonify({"success": False, "error": "yt-dlp download failed"}), 502
+        return jsonify({"success": False, "error": f"Could not find \"{title}\" on YouTube Music or YouTube"}), 502
 
 
 @app.route("/metadata")
