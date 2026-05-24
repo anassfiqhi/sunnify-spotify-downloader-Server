@@ -19,11 +19,7 @@ COPY server.py .
 ENV PORT=8001
 ENV CACHE_DIR=/tmp/sunnify
 
-EXPOSE 8001
+EXPOSE ${PORT}
 
-# 4 sync workers; 300s timeout to allow yt-dlp downloads to complete
-CMD ["gunicorn", "server:app", \
-     "--bind", "0.0.0.0:8001", \
-     "--workers", "4", \
-     "--timeout", "300", \
-     "--keep-alive", "5"]
+# Shell form so ${PORT} is expanded at runtime from Railway's injected env var
+CMD gunicorn server:app --bind 0.0.0.0:${PORT} --workers 4 --timeout 300 --keep-alive 5
