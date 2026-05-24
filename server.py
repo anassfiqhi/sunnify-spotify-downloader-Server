@@ -192,9 +192,16 @@ def _ensure_downloaded(spotify_id: str) -> Path | None:
             return p
         try:
             track = _embed_api.get_track(spotify_id)
-        except SpotifyDownAPIError:
+        except SpotifyDownAPIError as e:
+            print(f"[stream] metadata fetch failed for {spotify_id}: {e}")
             return None
-        return _ytdlp(track.title, track.artists, spotify_id)
+        print(f"[stream] downloading \"{track.title}\" by {track.artists}")
+        p = _ytdlp(track.title, track.artists, spotify_id)
+        if p:
+            print(f"[stream] ready — {spotify_id}")
+        else:
+            print(f"[stream] FAILED — could not download \"{track.title}\"")
+        return p
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
